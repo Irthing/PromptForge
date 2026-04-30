@@ -84,7 +84,8 @@
     if (!(options.body instanceof FormData)) {
       headers["Content-Type"] = "application/json";
     }
-    const response = await fetch(apiUrl(path), { ...options, headers });
+    const url = apiUrl(path);
+    const response = await fetch(url, { ...options, headers });
     const contentType = response.headers.get("content-type") || "";
     let payload = null;
     if (contentType.includes("application/json")) {
@@ -95,7 +96,7 @@
     if (!response.ok) {
       const message =
         payload?.detail || payload?.message || payload?.error || `请求失败，状态码：${response.status}`;
-      throw new Error(message);
+      throw new Error(`[${options?.method || "GET"} ${url} ${response.status}] ${message}`);
     }
     return payload;
   }
@@ -656,6 +657,7 @@
     const submitButton = form.querySelector('[type="submit"]');
     setButtonBusy(submitButton, true, "保存中");
     try {
+      const debugUrl = apiUrl("settings/provider");
       const settings = await fetchAPI("settings/provider", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -665,7 +667,7 @@
       closeSettingsModal();
       showNotification("模型设置已保存", "success");
     } catch (error) {
-      showNotification(`设置保存失败：${error.message}`, "error");
+      showNotification(`设置保存失败 [${debugUrl}]: ${error.message}`, "error");
     } finally {
       setButtonBusy(submitButton, false);
     }
