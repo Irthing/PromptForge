@@ -1,3 +1,4 @@
+运行
 from __future__ import annotations
 import json
 from datetime import datetime
@@ -87,8 +88,11 @@ class AIProviderSettingsRequest(BaseModel):
     api_key: Optional[str] = None
     model: str = "gpt-4o-mini"
     api_base: Optional[str] = None
-    temperature: float = Field(default=1.0, ge=0, le=2)
-    max_tokens: int = Field(default=4096, ge=1, le=128000)
+    # Temperature defaults to 0.7 instead of 1.0. Accept values between 0 and 2.
+    temperature: float = Field(default=0.7, ge=0, le=2)
+    # Increase the default max_tokens from 4096 to 8192 and raise the upper bound
+    # to 200000 to support models with very large context windows.
+    max_tokens: int = Field(default=8192, ge=1, le=200000)
     reasoning_effort: ReasoningEffort = "medium"
 
 
@@ -98,8 +102,9 @@ class AIProviderSettingsResponse(BaseModel):
     model: str = "gpt-4o-mini"
     api_base: str = "https://api.openai.com/v1"
     configured: bool = False
-    temperature: float = 1.0
-    max_tokens: int = 4096
+    # Reflect updated defaults in the response: temperature=0.7, max_tokens=8192
+    temperature: float = 0.7
+    max_tokens: int = 8192
     reasoning_effort: ReasoningEffort = "medium"
 
 

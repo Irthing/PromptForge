@@ -1,3 +1,4 @@
+运行
 """PromptForge API server - template management, AI provider settings, chat."""
 from __future__ import annotations
 import json
@@ -14,13 +15,22 @@ from ..core.engine import PromptEngine
 from ..core.models import PromptTemplate, TestResult
 from ..core.storage import Storage
 from .schemas import (
-    AIProviderSettingsRequest, AIProviderSettingsResponse,
-    AnalyticsResponse, ChatRequest, ChatResponse,
-    CreateTemplateRequest, EvaluatePromptRequest,
-    GenerateVariantsRequest, OptimizePromptRequest,
-    PromptTemplateResponse, RenderTemplateRequest,
-    RenderTemplateResponse, TestResultResponse,
-    UpdateTemplateRequest, template_to_response, test_result_to_response,
+    AIProviderSettingsRequest,
+    AIProviderSettingsResponse,
+    AnalyticsResponse,
+    ChatRequest,
+    ChatResponse,
+    CreateTemplateRequest,
+    EvaluatePromptRequest,
+    GenerateVariantsRequest,
+    OptimizePromptRequest,
+    PromptTemplateResponse,
+    RenderTemplateRequest,
+    RenderTemplateResponse,
+    TestResultResponse,
+    UpdateTemplateRequest,
+    template_to_response,
+    test_result_to_response,
 )
 
 router = APIRouter()
@@ -34,13 +44,26 @@ DEFAULT_API_BASES: Dict[str, str] = {
     "custom": "",
 }
 
+# Default configuration for the AI provider.
+#
+# The temperature controls the randomness of generated content. A lower value
+# results in more deterministic outputs, while higher values yield more
+# varied responses. Historically this project defaulted to 1.0, but it has
+# been updated to a saner default of 0.7 to balance creativity and
+# determinism. Similarly, the default `max_tokens` has been raised from
+# 4096 to 8192 so that longer outputs can be generated without users
+# needing to adjust the setting manually. These values are also used as
+# fall‑backs throughout the application and are clamped to sensible
+# ranges in the `_norm` helper below.
 DEFAULT_PROVIDER_CONFIG: Dict[str, Any] = {
     "provider": "openai",
     "api_key": "",
     "model": "gpt-4o-mini",
     "api_base": "https://api.openai.com/v1",
-    "temperature": 1.0,
-    "max_tokens": 4096,
+    # Updated defaults: temperature now defaults to 0.7 instead of 1.0
+    "temperature": 0.7,
+    # Allow more tokens by default. Previously 4096, now 8192.
+    "max_tokens": 8192,
     "reasoning_effort": "medium",
 }
 
@@ -77,8 +100,14 @@ def _norm(config: Dict[str, Any]) -> Dict[str, Any]:
     n["model"] = str(n.get("model") or DEFAULT_PROVIDER_CONFIG["model"])
     base = str(n.get("api_base") or "").strip().rstrip("/")
     n["api_base"] = base or DEFAULT_API_BASES.get(p, "")
-    n["temperature"] = _clamp(n.get("temperature"), 1.0, 0, 2)
-    n["max_tokens"] = int(_clamp(n.get("max_tokens"), 4096, 1, 128000))
+    # Clamp temperature around the updated default of 0.7 and ensure it
+    # stays within [0, 2]. If the provided value is invalid or None,
+    # `_clamp` will fall back to 0.7.
+    n["temperature"] = _clamp(n.get("temperature"), 0.7, 0, 2)
+    # Clamp max_tokens around the new default of 8192.  The upper bound
+    # has been increased to 200000 to accommodate models that support
+    # longer outputs.  Invalid or missing values fall back to 8192.
+    n["max_tokens"] = int(_clamp(n.get("max_tokens"), 8192, 1, 200000))
     r = str(n.get("reasoning_effort") or "medium")
     if r not in ALLOWED_REASONING:
         r = "medium"
@@ -113,10 +142,13 @@ def mask_key(key: Optional[str]) -> str:
 
 def pub_config(config: Dict[str, Any]) -> AIProviderSettingsResponse:
     return AIProviderSettingsResponse(
-        provider=config["provider"], model=config["model"],
-        api_base=config["api_base"], api_key=mask_key(config.get("api_key")),
+        provider=config["provider"],
+        model=config["model"],
+        api_base=config["api_base"],
+        api_key=mask_key(config.get("api_key")),
         configured=bool(config.get("api_key")),
-        temperature=config["temperature"], max_tokens=config["max_tokens"],
+        temperature=config["temperature"],
+        max_tokens=config["max_tokens"],
         reasoning_effort=config["reasoning_effort"],
     )
 
@@ -128,10 +160,18 @@ async def create_template(
     body: CreateTemplateRequest, storage: Storage = Depends(get_storage),
 ) -> PromptTemplateResponse:
     now = datetime.now(timezone.utc)
-    t = PromptTemplate(id=0, name=body.name, content=body.content,
-                       category=body.category, tags=body.tags,
-                       variables=body.variables, version=body.version,
-                       created_at=now, updated_at=now, metadata=body.metadata)
+    t = PromptTemplate(
+        id=0,
+        name=body.name,
+        content=body.content,
+        category=body.category,
+        tags=body.tags,
+        variables=body.variables,
+        version=body.version,
+        created_at=now,
+        updated_at=now,
+        metadata=body.metadata,
+    )
     t.id = storage.save_template(t)
     return template_to_response(t)
 
@@ -144,10 +184,18 @@ async def update_template(
     if not old:
         raise HTTPException(404, "模板不存在")
     now = datetime.now(timezone.utc)
-    t = PromptTemplate(id=tid, name=body.name, content=body.content,
-                       category=body.category, tags=body.tags,
-                       variables=body.variables, version=body.version,
-                       created_at=old.created_at, updated_at=now, metadata=body.metadata)
+    t = PromptTemplate(
+        id=tid,
+        name=body.name,
+        content=body.content,
+        category=body.category,
+        tags=body.tags,
+        variables=body.variables,
+        version=body.version,
+        created_at=old.created_at,
+        updated_at=now,
+        metadata=body.metadata,
+    )
     storage.save_template(t)
     return template_to_response(t)
 
@@ -249,8 +297,10 @@ async def save_provider_settings(
         "api_key": api_key,
         "model": inc.get("model", current.get("model", "gpt-4o-mini")),
         "api_base": inc.get("api_base", current.get("api_base", "")),
-        "temperature": inc.get("temperature", current.get("temperature", 1.0)),
-        "max_tokens": inc.get("max_tokens", current.get("max_tokens", 4096)),
+        # Use 0.7 as the fallback if the incoming temperature is None or invalid
+        "temperature": inc.get("temperature", current.get("temperature", 0.7)),
+        # Use 8192 as the fallback for max_tokens instead of 4096
+        "max_tokens": inc.get("max_tokens", current.get("max_tokens", 8192)),
         "reasoning_effort": inc.get("reasoning_effort", current.get("reasoning_effort", "medium")),
     })
     write_config(config)
@@ -275,16 +325,29 @@ async def _call_ai(config: Dict[str, Any], prompt: str) -> Dict[str, Any]:
 
     if p == "anthropic":
         url = (base or DEFAULT_API_BASES["anthropic"]).rstrip("/") + "/messages"
-        headers = {"x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"}
-        body = {"model": model, "max_tokens": max_tk, "temperature": temp,
-                "messages": [{"role": "user", "content": prompt}]}
+        headers = {
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+        body = {
+            "model": model,
+            "max_tokens": max_tk,
+            "temperature": temp,
+            "messages": [{"role": "user", "content": prompt}],
+        }
     else:
         url = (base or DEFAULT_API_BASES.get(p, "")).rstrip("/")
         if not url.endswith("/chat/completions"):
             url += "/chat/completions"
         headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-        body = {"model": model, "messages": [{"role": "user", "content": prompt}],
-                "temperature": temp, "max_tokens": max_tk, "reasoning_effort": effort}
+        body = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temp,
+            "max_tokens": max_tk,
+            "reasoning_effort": effort,
+        }
 
     async with httpx.AsyncClient(timeout=90) as client:
         r = await client.post(url, headers=headers, json=body)
@@ -311,7 +374,11 @@ async def _call_ai(config: Dict[str, Any], prompt: str) -> Dict[str, Any]:
         usg = data.get("usage") or {}
         tokens = int(usg.get("total_tokens") or usg.get("completion_tokens") or 0)
 
-    return {"response": response_text, "token_usage": tokens, "raw_response": data}
+    return {
+        "response": response_text,
+        "token_usage": tokens,
+        "raw_response": data,
+    }
 
 
 @router.post("/chat/", response_model=ChatResponse)
@@ -330,17 +397,39 @@ async def chat_with_provider(
     result = await _call_ai(config, rendered)
     latency = int((time.perf_counter() - start) * 1000)
     try:
-        tr = TestResult(id=0, template_id=t.id, model_name=config["model"],
-                        input_prompt=rendered, output_response=result["response"],
-                        score=0, latency_ms=latency,
-                        token_usage=int(result.get("token_usage", 0)),
-                        created_at=datetime.now(timezone.utc))
+        tr = TestResult(
+            id=0,
+            template_id=t.id,
+            model_name=config["model"],
+            input_prompt=rendered,
+            output_response=result["response"],
+            score=0,
+            latency_ms=latency,
+            token_usage=int(result.get("token_usage", 0)),
+            created_at=datetime.now(timezone.utc),
+        )
         tr.id = storage.save_test_result(tr)
     except Exception:
         pass
     return ChatResponse(
-        template_id=t.id, rendered=rendered, response=result["response"],
-        provider=config["provider"], model=config["model"],
-        latency_ms=latency, token_usage=int(result.get("token_usage", 0)),
+        template_id=t.id,
+        rendered=rendered,
+        response=result["response"],
+        provider=config["provider"],
+        model=config["model"],
+        latency_ms=latency,
+        token_usage=int(result.get("token_usage", 0)),
         raw_response=result.get("raw_response"),
     )
+
+These files incorporate all requested fixes:
+
+Issue 1: The API paths remain correct; fetchAPI("settings/provider") maps to /api/settings/provider.
+
+Issue 2: Temperature defaults to 0.7 across frontend, backend, and schema.
+
+Issue 3: max_tokens defaults to 8192, and the upper bound is 200000.
+
+Issue 4: The settings modal no longer closes when clicking the backdrop; only the close and cancel buttons (or pressing Escape) close it.
+
+Feel free to integrate these files into your project.
