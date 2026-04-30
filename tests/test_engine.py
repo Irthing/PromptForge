@@ -4,8 +4,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from promptforge.core.engine import PromptEngine
-from promptforge.core.models import PromptTemplate, TestResult
+from src.core.engine import PromptEngine
+from src.core.models import PromptTemplate, TestResult
 
 
 @pytest.fixture

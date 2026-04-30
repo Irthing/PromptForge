@@ -1,18 +1,12 @@
-"""
-PromptForge - Professional Prompt Engineering Toolkit
-
-A unified platform for prompt template management, A/B testing,
-evaluation and optimization for LLM prompts.
-"""
-
-import uvicorn
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from contextlib import asynccontextmanager
 import logging
 
-from src.api.server import app as api_router
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from src.api.server import router
 from src.core.storage import Storage
 
 logging.basicConfig(
@@ -22,10 +16,31 @@ logging.basicConfig(
 logger = logging.getLogger("promptforge")
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.storage = Storage()
+    logger.info("=" * 50)
+    logger.info("  PromptForge v1.0.0")
+    logger.info("  Professional Prompt Engineering Toolkit")
+    logger.info("=" * 50)
+    logger.info("Server starting up...")
+    logger.info("API docs available at http://localhost:8000/docs")
+    logger.info("Dashboard available at http://localhost:8000")
+    logger.info("=" * 50)
+    try:
+        yield
+    finally:
+        storage = getattr(app.state, "storage", None)
+        if storage is not None:
+            storage.close()
+        logger.info("Server shutting down...")
+
+
 app = FastAPI(
     title="PromptForge",
     description="Professional Prompt Engineering Toolkit - Template management, A/B testing, evaluation and optimization",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS
@@ -38,12 +53,10 @@ app.add_middleware(
 )
 
 # Mount API routes
-app.include_router(api_router, prefix="/api")
+app.include_router(router, prefix="/api")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="web/static"), name="static")
-
-storage = Storage()
 
 
 @app.get("/")
@@ -58,20 +71,8 @@ async def health_check():
     return {"status": "healthy", "version": "1.0.0"}
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Log server startup information."""
-    logger.info("=" * 50)
-    logger.info("  PromptForge v1.0.0")
-    logger.info("  Professional Prompt Engineering Toolkit")
-    logger.info("=" * 50)
-    logger.info("Server starting up...")
-    logger.info("API docs available at http://localhost:8000/docs")
-    logger.info("Dashboard available at http://localhost:8000")
-    logger.info("=" * 50)
-
-
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

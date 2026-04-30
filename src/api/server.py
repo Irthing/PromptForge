@@ -1,93 +1,143 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from .storage import Storage
-from .models import PromptTemplate, TestResult
-from .engine import PromptEngine
-from typing import List, Dict
+from datetime import datetime, timezone
+from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-app = FastAPI()
-
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+from ..core.engine import PromptEngine
+from ..core.models import PromptTemplate
+from ..core.storage import Storage
+from .schemas import (
+    AnalyticsResponse,
+    CreateTemplateRequest,
+    EvaluatePromptRequest,
+    GenerateVariantsRequest,
+    OptimizePromptRequest,
+    PromptTemplateResponse,
+    RenderTemplateRequest,
+    RenderTemplateResponse,
+    TestResultResponse,
+    template_to_response,
+    test_result_to_response,
 )
 
-storage = Storage()
+
+router = APIRouter()
 
 
-@app.post("/templates/")
-async def create_template(template: PromptTemplate):
-    storage.save_template(template)
-    return template
+def get_storage(request: Request) -> Storage:
+    storage = getattr(request.app.state, "storage", None)
+    if storage is None:
+        raise HTTPException(status_code=500, detail="Storage is not initialized")
+    return storage
 
 
-@app.get("/templates/{template_id}")
-async def get_template(template_id: int):
+@router.post("/templates/", response_model=PromptTemplateResponse)
+async def create_template(
+    request_body: CreateTemplateRequest,
+    storage: Storage = Depends(get_storage),
+) -> PromptTemplateResponse:
+    now = datetime.now(timezone.utc)
+    template = PromptTemplate(
+        id=0,
+        name=request_body.name,
+        content=request_body.content,
+        category=request_body.category,
+        tags=request_body.tags,
+        variables=request_body.variables,
+        version=request_body.version,
+        created_at=now,
+        updated_at=now,
+        metadata=request_body.metadata,
+    )
+    template.id = storage.save_template(template)
+    return template_to_response(template)
+
+
+@router.get("/templates/{template_id}", response_model=PromptTemplateResponse)
+async def get_template(
+    template_id: int,
+    storage: Storage = Depends(get_storage),
+) -> PromptTemplateResponse:
     template = storage.get_template(template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    return template
+    return template_to_response(template)
 
 
-@app.get("/templates/")
-async def list_templates() -> List[PromptTemplate]:
-    return storage.list_templates()
+@router.get("/templates/", response_model=List[PromptTemplateResponse])
+async def list_templates(
+    storage: Storage = Depends(get_storage),
+) -> List[PromptTemplateResponse]:
+    return [template_to_response(t) for t in storage.list_templates()]
 
 
-@app.delete("/templates/{template_id}")
-async def delete_template(template_id: int):
-    storage.delete_template(template_id)
+@router.delete("/templates/{template_id}")
+async def delete_template(
+    template_id: int,
+    storage: Storage = Depends(get_storage),
+) -> dict:
+    deleted = storage.delete_template(template_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Template not found")
     return {"message": "Template deleted successfully"}
 
 
-@app.post("/render/")
-async def render_template(template_id: int, context: Dict[str, str]):
-    template = storage.get_template(template_id)
+@router.post("/render/", response_model=RenderTemplateResponse)
+async def render_template(
+    request_body: RenderTemplateRequest,
+    storage: Storage = Depends(get_storage),
+) -> RenderTemplateResponse:
+    template = storage.get_template(request_body.template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    rendered = PromptEngine.render_template(template, context)
-    return {"rendered": rendered}
+    rendered = PromptEngine.render_template(template, request_body.context)
+    return RenderTemplateResponse(rendered=rendered)
 
 
-@app.post("/evaluate/")
-async def evaluate_prompt(template_id: int, input_data: Dict[str, str], model_name: str):
-    template = storage.get_template(template_id)
+@router.post("/evaluate/", response_model=TestResultResponse)
+async def evaluate_prompt(
+    request_body: EvaluatePromptRequest,
+    storage: Storage = Depends(get_storage),
+) -> TestResultResponse:
+    template = storage.get_template(request_body.template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    result = PromptEngine.evaluate_prompt(template, input_data, model_name)
-    storage.save_test_result(result)
-    return result
+    result = PromptEngine.evaluate_prompt(
+        template=template,
+        input_data=request_body.input_data,
+        model_name=request_body.model_name,
+    )
+    result.id = storage.save_test_result(result)
+    return test_result_to_response(result)
 
 
-@app.post("/optimize/")
-async def optimize_prompt(template_id: int):
-    template = storage.get_template(template_id)
+@router.post("/optimize/", response_model=PromptTemplateResponse)
+async def optimize_prompt(
+    request_body: OptimizePromptRequest,
+    storage: Storage = Depends(get_storage),
+) -> PromptTemplateResponse:
+    template = storage.get_template(request_body.template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    optimized_template = PromptEngine.optimize_prompt(template)
-    storage.save_template(optimized_template)
-    return optimized_template
+    optimized = PromptEngine.optimize_prompt(template)
+    optimized.id = storage.save_template(optimized)
+    return template_to_response(optimized)
 
 
-@app.post("/variants/")
-async def generate_variants(template_id: int):
-    template = storage.get_template(template_id)
+@router.post("/variants/", response_model=List[PromptTemplateResponse])
+async def generate_variants(
+    request_body: GenerateVariantsRequest,
+    storage: Storage = Depends(get_storage),
+) -> List[PromptTemplateResponse]:
+    template = storage.get_template(request_body.template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     variants = PromptEngine.generate_variants(template)
-    return variants
+    return [template_to_response(v) for v in variants]
 
 
-@app.get("/analytics/")
-async def get_analytics():
-    analytics = storage.get_analytics()
-    return analytics
+@router.get("/analytics/", response_model=AnalyticsResponse)
+async def get_analytics(
+    storage: Storage = Depends(get_storage),
+) -> AnalyticsResponse:
+    return AnalyticsResponse(**storage.get_analytics())
