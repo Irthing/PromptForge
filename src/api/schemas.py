@@ -1,14 +1,11 @@
-运行
 from __future__ import annotations
-
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
-
 from pydantic import BaseModel, Field
 
-
 AIProviderName = Literal["openai", "anthropic", "custom"]
+ReasoningEffort = Literal["low", "medium", "high"]
 
 
 class CreateTemplateRequest(BaseModel):
@@ -90,6 +87,9 @@ class AIProviderSettingsRequest(BaseModel):
     api_key: Optional[str] = None
     model: str = "gpt-4o-mini"
     api_base: Optional[str] = None
+    temperature: float = Field(default=1.0, ge=0, le=2)
+    max_tokens: int = Field(default=4096, ge=1, le=128000)
+    reasoning_effort: ReasoningEffort = "medium"
 
 
 class AIProviderSettingsResponse(BaseModel):
@@ -98,6 +98,9 @@ class AIProviderSettingsResponse(BaseModel):
     model: str = "gpt-4o-mini"
     api_base: str = "https://api.openai.com/v1"
     configured: bool = False
+    temperature: float = 1.0
+    max_tokens: int = 4096
+    reasoning_effort: ReasoningEffort = "medium"
 
 
 class ChatRequest(BaseModel):
@@ -120,35 +123,27 @@ class ChatResponse(BaseModel):
 def ensure_list(value: Any) -> List[str]:
     if value is None:
         return []
-
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
-
     if isinstance(value, str):
         return [item.strip() for item in value.split(",") if item.strip()]
-
     return [str(value).strip()] if str(value).strip() else []
 
 
 def ensure_metadata(value: Any) -> Dict[str, Any]:
     if value is None:
         return {}
-
     if isinstance(value, dict):
         return value
-
     if isinstance(value, str):
         text = value.strip()
-
         if not text:
             return {}
-
         try:
             parsed = json.loads(text)
             return parsed if isinstance(parsed, dict) else {}
         except json.JSONDecodeError:
             return {}
-
     return {}
 
 
