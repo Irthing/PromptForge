@@ -13,7 +13,7 @@ const selectors = {
   templateModal: "#templateModal",
   templateForm: "#templateForm",
   modalTitle: "#modalTitle",
-  notificationStack: "#notificationStack",
+  notificationStack: "#toastContainer",
   analyticsTemplates: "#analyticsTemplates",
   analyticsTests: "#analyticsTests",
   analyticsAvgScore: "#analyticsAvgScore",
@@ -147,13 +147,23 @@ function renderTemplateGrid() {
 
   const templates = filteredTemplates();
 
+  // Update result summary
+  const summary = qs("#resultSummary");
+  if (summary) {
+    summary.textContent = `共 ${templates.length} 个模板，筛选自 ${state.templates.length} 个`;
+  }
+
+  // Toggle empty state
+  qs("#emptyState")?.classList.toggle("hidden", templates.length > 0);
+
+  const templates = filteredTemplates();
+
   if (templates.length === 0) {
     grid.innerHTML = `
       <div class="empty-state">
-        <div>
-          <h3>No templates found</h3>
-          <p>Create a prompt template or adjust your filters.</p>
-        </div>
+        <div class="empty-illustration">✦</div>
+        <h3>暂无模板</h3>
+        <p>创建一个提示词模板或调整筛选条件。</p>
       </div>
     `;
     return;
@@ -171,21 +181,24 @@ function renderCategories() {
     .sort((a, b) => a.localeCompare(b))
     .map(
       (category) => `
-        <button class="category-filter" type="button" data-category-filter="${escapeHTML(category)}">
-          <span>${escapeHTML(category)}</span>
-          <span>${state.templates.filter((template) => template.category === category).length}</span>
+        <button class="category-item" type="button" data-category-filter="${escapeHTML(category)}">
+          <span class="category-name">${escapeHTML(category)}</span>
+          <span class="category-number">${state.templates.filter((t) => t.category === category).length}</span>
         </button>
       `,
     )
     .join("");
 
   container.innerHTML = `
-    <button class="category-filter active" type="button" data-category-filter="all">
-      <span>All Templates</span>
-      <span>${state.templates.length}</span>
+    <button class="category-item active" type="button" data-category-filter="all">
+      <span class="category-name">全部模板</span>
+      <span class="category-number">${state.templates.length}</span>
     </button>
     ${categoryButtons}
   `;
+
+  const badge = qs("#categoryCount");
+  if (badge) badge.textContent = categories.size;
 }
 
 async function loadTemplates() {
@@ -233,7 +246,7 @@ function openTemplateModal(template = null) {
 
   state.activeTemplateId = template?.id ?? null;
 
-  qs(selectors.modalTitle).textContent = template ? "Edit Template" : "Create Template";
+  qs(selectors.modalTitle).textContent = template ? "编辑模板" : "新建模板";
   form.elements.name.value = template?.name || "";
   form.elements.category.value = template?.category || "";
   form.elements.version.value = template?.version || "1.0.0";
@@ -282,7 +295,7 @@ async function createTemplate(event) {
   };
 
   if (!payload.name || !payload.content) {
-    showNotification("Name and content are required.", "warning");
+    showNotification("模板名称和内容不能为空", "warning");
     return;
   }
 
@@ -292,7 +305,7 @@ async function createTemplate(event) {
       body: JSON.stringify(payload),
     });
 
-    showNotification("Template saved.", "success");
+    showNotification("模板已保存", "success");
     closeTemplateModal();
     await loadTemplates();
   } catch (error) {
@@ -308,12 +321,12 @@ async function deleteTemplate(templateId) {
     return;
   }
 
-  const shouldDelete = window.confirm(`Delete "${template.name}"?`);
+  const shouldDelete = window.confirm(`确定要删除"${template.name}"吗？`);
   if (!shouldDelete) return;
 
   try {
     await fetchAPI(`/templates/${templateId}`, { method: "DELETE" });
-    showNotification("Template deleted.", "success");
+    showNotification("模板已删除", "success");
     await loadTemplates();
   } catch (error) {
     showNotification(error.message, "error");
@@ -322,16 +335,32 @@ async function deleteTemplate(templateId) {
 
 async function renderPreview(templateId, context = {}) {
   const template = state.templates.find((item) => Number(item.id) === Number(templateId));
+  if (!template) {
+    showNotification("模板未找到", "error");
+    return null;
+  }
+
+  state.activeTemplateId = templateId;
   const defaultContext = Object.fromEntries(
-    (template?.variables || []).map((variable) => [variable, `{${variable}}`]),
+    (template.variables || []).map((variable) => [variable, `{${variable}}`]),
   );
+
+  // Update preview panel UI
+  const nameEl = qs("#previewTemplateName");
+  if (nameEl) nameEl.textContent = template.name;
+
+  // Update context input with variable hints
+  const ctxInput = qs("#contextInput");
+  if (ctxInput && Object.keys(context).length === 0) {
+    ctxInput.value = JSON.stringify(defaultContext, null, 2);
+  }
 
   try {
     const response = await fetchAPI(
-      `/render/?template_id=${encodeURIComponent(templateId)}`,
+      `/render/`,
       {
         method: "POST",
-        body: JSON.stringify({ ...defaultContext, ...context }),
+        body: JSON.stringify({ template_id: templateId, context: { ...defaultContext, ...context } }),
       },
     );
 
@@ -340,10 +369,10 @@ async function renderPreview(templateId, context = {}) {
 
     if (output) {
       output.textContent = rendered;
-      output.closest(".panel")?.classList.remove("hidden");
     }
 
-    showNotification("Preview rendered.", "success");
+    qs("#previewPanel")?.classList.remove("hidden");
+    showNotification("预览已生成", "success");
     return rendered;
   } catch (error) {
     showNotification(error.message, "error");
@@ -368,7 +397,7 @@ async function evaluatePrompt(templateId, inputData = {}, modelName = "local-pre
       body: JSON.stringify({ ...defaultInput, ...inputData }),
     });
 
-    showNotification(`Evaluation complete. Score: ${result.score ?? "N/A"}`, "success");
+    showNotification(`评估完成。得分: ${result.score ?? "N/A"}`, "success");
     await loadAnalytics();
     return result;
   } catch (error) {
@@ -401,25 +430,25 @@ async function searchTemplates(query) {
 }
 
 function showNotification(message, type = "info", timeout = 4200) {
-  let stack = qs(selectors.notificationStack);
+  let container = qs(selectors.notificationStack);
 
-  if (!stack) {
-    stack = document.createElement("div");
-    stack.id = "notificationStack";
-    stack.className = "notification-stack";
-    document.body.appendChild(stack);
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    document.body.appendChild(container);
   }
 
-  const notification = document.createElement("div");
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
 
-  stack.appendChild(notification);
+  container.appendChild(toast);
 
   window.setTimeout(() => {
-    notification.style.opacity = "0";
-    notification.style.transform = "translateX(12px)";
-    window.setTimeout(() => notification.remove(), 180);
+    toast.style.opacity = "0";
+    toast.style.transform = "translateX(24px)";
+    window.setTimeout(() => toast.remove(), 180);
   }, timeout);
 }
 
@@ -477,6 +506,43 @@ function bindEvents() {
     if (event.target.matches(selectors.templateModal)) {
       closeTemplateModal();
     }
+  });
+
+  // New UI handlers
+  qs("#refreshButton")?.addEventListener("click", loadTemplates);
+  qs("#emptyCreateButton")?.addEventListener("click", () => openTemplateModal());
+  qs("#closePreviewButton")?.addEventListener("click", () => {
+    qs("#previewPanel")?.classList.add("hidden");
+  });
+  qs("#renderPreviewButton")?.addEventListener("click", async () => {
+    const templateId = state.activeTemplateId;
+    if (!templateId) return showNotification("请先点击模板的预览按钮", "warning");
+    try {
+      const contextText = qs("#contextInput")?.value;
+      let context = {};
+      if (contextText) {
+        try { context = JSON.parse(contextText); }
+        catch { showNotification("JSON 格式错误", "error"); return; }
+      }
+      await renderPreview(templateId, context);
+    } catch (e) { showNotification(e.message, "error"); }
+  });
+  qs("#clearContextButton")?.addEventListener("click", () => {
+    qs("#contextInput").value = "";
+  });
+  qs("#copyPreviewButton")?.addEventListener("click", () => {
+    const text = qs("#previewOutput")?.textContent;
+    if (text && text !== "暂无预览内容") {
+      navigator.clipboard.writeText(text).then(() => showNotification("已复制到剪贴板", "success"));
+    }
+  });
+  qs("#sortSelect")?.addEventListener("change", (event) => {
+    const sort = event.target.value;
+    state.templates.sort((a, b) => {
+      if (sort === "name") return a.name.localeCompare(b.name);
+      return new Date(b.updated_at) - new Date(a.updated_at);
+    });
+    renderTemplateGrid();
   });
 }
 

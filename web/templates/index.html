@@ -1,262 +1,207 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{{ app_name | default("PromptForge") }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}" />
-  </head>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PromptForge - 专业提示词工程工具包</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div class="bg-orb orb-pink"></div>
+  <div class="bg-orb orb-blue"></div>
+  <div class="bg-grid"></div>
 
-  <body>
-    <div class="layout">
-      <aside class="sidebar">
-        <div class="sidebar-logo">
-          <div class="logo-mark">PF</div>
-          <div>
-            <div>PromptForge</div>
-            <div class="text-xs font-medium text-slate-400">Engineering Toolkit</div>
-          </div>
+  <div id="app" class="app-shell">
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand-mark">PF</div>
+        <div>
+          <h1 class="logo">PromptForge</h1>
+          <p class="tagline">专业提示词工程工具包</p>
         </div>
+      </div>
 
-        <section class="sidebar-section">
-          <div class="sidebar-title">Navigation</div>
-          <a class="sidebar-link active" href="#templates">
-            <span>Templates</span>
-            <span>⌘1</span>
-          </a>
-          <a class="sidebar-link" href="#analytics">
-            <span>Analytics</span>
-            <span>⌘2</span>
-          </a>
-          <a class="sidebar-link" href="#preview">
-            <span>Preview</span>
-            <span>⌘3</span>
-          </a>
+      <div class="header-actions">
+        <button id="refreshButton" class="btn btn-ghost" type="button">刷新数据</button>
+        <button id="createTemplateButton" class="btn btn-primary" type="button">新建模板</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <aside class="sidebar">
+        <section class="glass-card search-panel">
+          <label for="searchInput" class="section-label">模板搜索</label>
+          <div class="search-box">
+            <span class="search-icon">⌕</span>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="搜索名称、内容或标签"
+              autocomplete="off"
+            />
+          </div>
         </section>
 
-        <section class="sidebar-section">
-          <div class="sidebar-title">Categories</div>
-          <div id="categoryFilterList">
-            {% for category in categories | default([]) %}
-              <button
-                class="category-filter {% if loop.first %}active{% endif %}"
-                type="button"
-                data-category-filter="{{ category.name }}"
-              >
-                <span>{{ category.icon | default("◇") }} {{ category.name }}</span>
-                <span>{{ category.count | default(0) }}</span>
-              </button>
-            {% else %}
-              <button class="category-filter active" type="button" data-category-filter="all">
-                <span>All Templates</span>
-                <span>0</span>
-              </button>
-            {% endfor %}
+        <section class="glass-card category-panel">
+          <div class="panel-title-row">
+            <h2>分类筛选</h2>
+            <span id="categoryCount" class="mini-badge">0</span>
           </div>
+          <nav id="categoryFilterList" class="category-list"></nav>
         </section>
       </aside>
 
-      <main class="main-shell">
-        <header class="header">
-          <div>
-            <h1 class="header-title">Prompt Management Dashboard</h1>
-            <p class="mt-1 text-sm text-slate-400">
-              Build, version, test, and optimize reusable prompt templates.
-            </p>
+      <section class="content">
+        <section class="stats-row">
+          <article class="stat-card">
+            <div class="stat-icon">✦</div>
+            <div>
+              <h3>模板总数</h3>
+              <p id="analyticsTemplates">0</p>
+            </div>
+          </article>
+
+          <article class="stat-card">
+            <div class="stat-icon">⚡</div>
+            <div>
+              <h3>测试次数</h3>
+              <p id="analyticsTests">0</p>
+            </div>
+          </article>
+
+          <article class="stat-card">
+            <div class="stat-icon">★</div>
+            <div>
+              <h3>平均得分</h3>
+              <p id="analyticsAvgScore">0.00</p>
+            </div>
+          </article>
+        </section>
+
+        <section id="previewPanel" class="preview-panel glass-card hidden">
+          <div class="panel-title-row">
+            <div>
+              <h2>渲染预览</h2>
+              <p id="previewTemplateName" class="muted-text">选择模板后可输入变量并生成预览</p>
+            </div>
+            <button id="closePreviewButton" class="icon-button" type="button" aria-label="关闭预览">×</button>
           </div>
 
-          <div class="header-actions">
-            <label class="search-bar" for="searchInput">
-              <span class="search-icon">⌕</span>
-              <input
-                id="searchInput"
-                type="search"
-                name="search"
-                placeholder="Search templates, tags, variables..."
-                autocomplete="off"
-              />
-            </label>
+          <div class="preview-layout">
+            <div class="context-box">
+              <label for="contextInput">变量上下文</label>
+              <textarea
+                id="contextInput"
+                rows="8"
+                placeholder='请输入 JSON，例如：{"产品":"智能手表","受众":"年轻用户"}'
+              ></textarea>
+              <div class="preview-actions">
+                <button id="renderPreviewButton" class="btn btn-primary" type="button">生成预览</button>
+                <button id="clearContextButton" class="btn btn-secondary" type="button">清空变量</button>
+              </div>
+            </div>
 
-            <button id="createTemplateButton" class="btn btn-primary" type="button">
-              <span>＋</span>
-              <span>New Template</span>
-            </button>
-          </div>
-        </header>
-
-        <section id="analytics" class="mb-6">
-          <div class="grid gap-4 md:grid-cols-3">
-            <article class="summary-card">
-              <div class="summary-label">Templates</div>
-              <div id="analyticsTemplates" class="summary-value">{{ analytics.templates_count | default(0) }}</div>
-            </article>
-
-            <article class="summary-card">
-              <div class="summary-label">Test Runs</div>
-              <div id="analyticsTests" class="summary-value">{{ analytics.test_results_count | default(0) }}</div>
-            </article>
-
-            <article class="summary-card">
-              <div class="summary-label">Avg. Score</div>
-              <div id="analyticsAvgScore" class="summary-value">{{ analytics.average_score | default(0) }}</div>
-            </article>
+            <div class="render-box">
+              <div class="render-header">
+                <span>输出结果</span>
+                <button id="copyPreviewButton" class="btn-small" type="button">复制</button>
+              </div>
+              <pre id="previewOutput">暂无预览内容</pre>
+            </div>
           </div>
         </section>
 
-        <div class="dashboard-grid">
-          <section id="templates">
-            <div class="mb-4 flex items-center justify-between gap-4">
-              <div>
-                <h2 class="text-xl font-extrabold tracking-tight">Templates</h2>
-                <p class="text-sm text-slate-400">Reusable prompts with Jinja2 variables.</p>
-              </div>
-            </div>
-
-            <div id="templateGrid" class="template-grid">
-              {% for template in templates | default([]) %}
-                <article class="template-card" data-template-id="{{ template.id }}">
-                  <div class="template-card-header">
-                    <h3 class="template-name">{{ template.name }}</h3>
-                    <p class="template-category">{{ template.category }} · v{{ template.version }}</p>
-                  </div>
-
-                  <p class="template-content-preview">{{ template.content }}</p>
-
-                  <div class="template-card-footer">
-                    <div class="tag-row">
-                      {% for tag in template.tags %}
-                        <span class="tag-badge">#{{ tag }}</span>
-                      {% endfor %}
-                    </div>
-
-                    <div class="template-actions">
-                      <button class="icon-btn" type="button" data-action="preview" data-id="{{ template.id }}">▶</button>
-                      <button class="icon-btn" type="button" data-action="edit" data-id="{{ template.id }}">✎</button>
-                      <button class="icon-btn" type="button" data-action="evaluate" data-id="{{ template.id }}">◎</button>
-                      <button class="icon-btn" type="button" data-action="delete" data-id="{{ template.id }}">×</button>
-                    </div>
-                  </div>
-                </article>
-              {% else %}
-                <div class="empty-state">
-                  <div>
-                    <h3 class="text-lg font-bold text-slate-200">No templates yet</h3>
-                    <p class="mt-1">Create your first reusable prompt template.</p>
-                  </div>
-                </div>
-              {% endfor %}
-            </div>
-          </section>
-
-          <aside class="analytics-section">
-            <section id="preview" class="panel hidden">
-              <div class="mb-3 flex items-center justify-between gap-3">
-                <h2 class="text-lg font-extrabold tracking-tight">Rendered Preview</h2>
-                <span class="tag-badge">Live</span>
-              </div>
-              <div class="code-editor-area">
-                <div class="code-editor-toolbar">
-                  <span class="text-sm text-slate-400">Output</span>
-                  <span class="text-xs text-slate-500">Jinja2</span>
-                </div>
-                <pre id="previewOutput"></pre>
-              </div>
-            </section>
-
-            <section class="panel">
-              <div class="mb-3">
-                <h2 class="text-lg font-extrabold tracking-tight">Analytics</h2>
-                <p class="text-sm text-slate-400">Prompt activity and quality trends.</p>
-              </div>
-
-              <div class="analytics-chart">
-                <div class="chart-bar"><span style="width: 78%"></span></div>
-                <div class="chart-bar"><span style="width: 52%"></span></div>
-                <div class="chart-bar"><span style="width: 64%"></span></div>
-                <div class="chart-bar"><span style="width: 38%"></span></div>
-              </div>
-            </section>
-
-            <section class="panel">
-              <h2 class="mb-3 text-lg font-extrabold tracking-tight">Popular Tags</h2>
-              <div class="tag-row">
-                {% for tag in tags | default(["marketing", "support", "analysis", "coding"]) %}
-                  <span class="tag-badge">#{{ tag }}</span>
-                {% endfor %}
-              </div>
-            </section>
-          </aside>
-        </div>
-      </main>
-    </div>
-
-    <div id="templateModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-dialog">
-        <div class="modal-header">
-          <h2 id="modalTitle" class="text-xl font-extrabold tracking-tight">Create Template</h2>
-          <button id="closeModalButton" class="icon-btn" type="button" aria-label="Close modal">×</button>
-        </div>
-
-        <form id="templateForm">
-          <div class="modal-body form-grid">
-            <div class="grid gap-4 md:grid-cols-2">
-              <div class="form-row">
-                <label for="templateName">Name</label>
-                <input id="templateName" name="name" type="text" placeholder="Customer Support Reply" required />
-              </div>
-
-              <div class="form-row">
-                <label for="templateCategory">Category</label>
-                <input id="templateCategory" name="category" type="text" placeholder="Support" />
-              </div>
-            </div>
-
-            <div class="grid gap-4 md:grid-cols-2">
-              <div class="form-row">
-                <label for="templateVersion">Version</label>
-                <input id="templateVersion" name="version" type="text" value="1.0.0" />
-              </div>
-
-              <div class="form-row">
-                <label for="templateTags">Tags</label>
-                <input id="templateTags" name="tags" type="text" placeholder="support, email, tone" />
-              </div>
-            </div>
-
-            <div class="form-row">
-              <label for="templateVariables">Variables</label>
-              <input id="templateVariables" name="variables" type="text" placeholder="customer_name, issue, tone" />
-            </div>
-
-            <div class="form-row">
-              <label for="templateContent">Prompt Content</label>
-              <div class="code-editor-area">
-                <div class="code-editor-toolbar">
-                  <span class="text-sm text-slate-400">Use Jinja2 variables like {{ "{{ customer_name }}" }}</span>
-                  <span class="text-xs text-slate-500">Prompt</span>
-                </div>
-                <textarea
-                  id="templateContent"
-                  name="content"
-                  rows="12"
-                  placeholder="Write a {{ tone }} response to {{ customer_name }} about {{ issue }}..."
-                  required
-                ></textarea>
-              </div>
-            </div>
+        <section class="toolbar glass-card">
+          <div>
+            <h2>模板库</h2>
+            <p id="resultSummary" class="muted-text">正在载入模板</p>
           </div>
-
-          <div class="modal-footer">
-            <button id="cancelModalButton" class="btn" type="button">Cancel</button>
-            <button class="btn btn-primary" type="submit">Save Template</button>
+          <div class="toolbar-actions">
+            <select id="sortSelect" aria-label="排序方式">
+              <option value="newest">最近更新</option>
+              <option value="name">名称排序</option>
+              <option value="score">得分优先</option>
+            </select>
           </div>
-        </form>
+        </section>
+
+        <section id="templateGrid" class="template-grid"></section>
+
+        <section id="emptyState" class="empty-state glass-card hidden">
+          <div class="empty-illustration">✧</div>
+          <h2>没有找到模板</h2>
+          <p>尝试调整搜索关键词，或创建一个新的提示词模板。</p>
+          <button id="emptyCreateButton" class="btn btn-primary" type="button">立即新建</button>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="templateModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitle">新建模板</h2>
+          <p class="muted-text">沉淀可复用、可评估、可渲染的提示词资产</p>
+        </div>
+        <button id="closeModalButton" class="icon-button" type="button" aria-label="关闭弹窗">×</button>
       </div>
+
+      <form id="templateForm">
+        <input type="hidden" name="id" />
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="templateName">名称</label>
+            <input id="templateName" name="name" required placeholder="例如：产品卖点提炼" />
+          </div>
+
+          <div class="form-group">
+            <label for="templateCategory">分类</label>
+            <input id="templateCategory" name="category" placeholder="例如：营销文案" />
+          </div>
+
+          <div class="form-group">
+            <label for="templateVersion">版本</label>
+            <input id="templateVersion" name="version" value="1.0" placeholder="例如：1.0" />
+          </div>
+        </div>
+
+        <div class="form-grid two">
+          <div class="form-group">
+            <label for="templateTags">标签（逗号分隔）</label>
+            <input id="templateTags" name="tags" placeholder="例如：营销,小红书,转化" />
+          </div>
+
+          <div class="form-group">
+            <label for="templateVariables">变量（逗号分隔）</label>
+            <input id="templateVariables" name="variables" placeholder="例如：产品,受众,语气" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="templateContent">内容</label>
+          <textarea
+            id="templateContent"
+            name="content"
+            rows="9"
+            required
+            placeholder="请输入模板内容，可使用 {{变量名}} 作为占位符"
+          ></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="cancelModalButton" class="btn btn-secondary">取消</button>
+          <button type="submit" class="btn btn-primary">保存模板</button>
+        </div>
+      </form>
     </div>
+  </div>
 
-    <div id="notificationStack" class="notification-stack" aria-live="polite"></div>
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-    <script src="{{ url_for('static', path='/js/app.js') }}"></script>
-  </body>
+  <script src="/static/js/app.js"></script>
+</body>
 </html>
