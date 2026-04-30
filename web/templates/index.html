@@ -22,6 +22,8 @@
       </div>
 
       <div class="header-actions">
+        <button id="guideButton" class="btn btn-ghost" type="button">使用说明</button>
+        <button id="settingsButton" class="btn btn-ghost" type="button">设置</button>
         <button id="refreshButton" class="btn btn-ghost" type="button">刷新数据</button>
         <button id="createTemplateButton" class="btn btn-primary" type="button">新建模板</button>
       </div>
@@ -81,8 +83,8 @@
         <section id="previewPanel" class="preview-panel glass-card hidden">
           <div class="panel-title-row">
             <div>
-              <h2>渲染预览</h2>
-              <p id="previewTemplateName" class="muted-text">选择模板后可输入变量并生成预览</p>
+              <h2>运行与预览</h2>
+              <p id="previewTemplateName" class="muted-text">选择模板后可输入变量并运行模型</p>
             </div>
             <button id="closePreviewButton" class="icon-button" type="button" aria-label="关闭预览">×</button>
           </div>
@@ -93,17 +95,18 @@
               <textarea
                 id="contextInput"
                 rows="8"
-                placeholder='请输入 JSON，例如：{"产品":"智能手表","受众":"年轻用户"}'
+                placeholder='请输入变量对象，例如：{"产品":"智能手表","受众":"年轻用户"}'
               ></textarea>
               <div class="preview-actions">
-                <button id="renderPreviewButton" class="btn btn-primary" type="button">生成预览</button>
+                <button id="renderPreviewButton" class="btn btn-secondary" type="button">生成预览</button>
+                <button id="runChatButton" class="btn btn-primary" type="button">运行模型</button>
                 <button id="clearContextButton" class="btn btn-secondary" type="button">清空变量</button>
               </div>
             </div>
 
             <div class="render-box">
               <div class="render-header">
-                <span>输出结果</span>
+                <span id="previewOutputTitle">输出结果</span>
                 <button id="copyPreviewButton" class="btn-small" type="button">复制</button>
               </div>
               <pre id="previewOutput">暂无预览内容</pre>
@@ -144,7 +147,7 @@
       <div class="modal-header">
         <div>
           <h2 id="modalTitle">新建模板</h2>
-          <p class="muted-text">沉淀可复用、可评估、可渲染的提示词资产</p>
+          <p class="muted-text">沉淀可复用、可评估、可运行的提示词资产</p>
         </div>
         <button id="closeModalButton" class="icon-button" type="button" aria-label="关闭弹窗">×</button>
       </div>
@@ -195,6 +198,122 @@
         <div class="modal-footer">
           <button type="button" id="cancelModalButton" class="btn btn-secondary">取消</button>
           <button type="submit" class="btn btn-primary">保存模板</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 使用说明弹窗 -->
+  <div id="guideModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content guide-content" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <div>
+          <h2>📖 PromptForge 使用指南</h2>
+          <p class="muted-text">把你的 AI 提示词变成可管理、可复用、可运行的资产</p>
+        </div>
+        <button id="closeGuideButton" class="icon-button" type="button" aria-label="关闭">×</button>
+      </div>
+
+      <div class="guide-body">
+        <section class="guide-section">
+          <h3>🎯 这是什么？</h3>
+          <p>PromptForge 是一个提示词管理工具。你平时用 ChatGPT 学习/工作，每次都要写各种 prompt 很烦？把它存成模板，下次直接调用，不用重复发明轮子。</p>
+        </section>
+
+        <section class="guide-section">
+          <h3>🚀 快速上手</h3>
+          <div class="guide-step"><span class="step-num">1</span> <strong>新建模板</strong> — 点「新建模板」，填写提示词内容，用 <code>{{变量名}}</code> 标记可变部分</div>
+          <div class="guide-step"><span class="step-num">2</span> <strong>渲染预览</strong> — 点卡片上的 ▶ 按钮，在预览面板填入变量值（JSON格式），点「生成预览」查看效果</div>
+          <div class="guide-step"><span class="step-num">3</span> <strong>连接 AI</strong> — 点「设置」填入你的 API Key（OpenAI/Claude），保存后点 ◎ 即可真实调用 AI 评估</div>
+          <div class="guide-step"><span class="step-num">4</span> <strong>管理模板</strong> — 点 ✎ 编辑、× 删除，左侧分类筛选，搜索框快速检索</div>
+        </section>
+
+        <section class="guide-section">
+          <h3>📝 模板示例</h3>
+          <div class="guide-example">
+            <p><b>刷题模板：</b><br><code>你是一名高三{{科目}}老师，请根据{{知识点}}出一道{{题型}}，难度{{难度}}，并附上解析。</code></p>
+            <p><b>作文批改：</b><br><code>请以高考评分标准批改以下作文，从内容、结构、语言三方面打分：{{作文}}</code></p>
+            <p><b>知识点讲解：</b><br><code>用通俗易懂的语言解释{{概念}}，并举一个生活中的例子，控制在{{字数}}字以内。</code></p>
+          </div>
+        </section>
+
+        <section class="guide-section">
+          <h3>⚙️ 高阶用法</h3>
+          <ul>
+            <li><strong>A/B 测试</strong> — 同一 task 写多个版本，评估得分对比哪个更好</li>
+            <li><strong>版本管理</strong> — 每次编辑自动存档，不满意可回退</li>
+            <li><strong>分类标签</strong> — 用分类和标签组织模板，搜索秒级定位</li>
+            <li><strong>排序筛选</strong> — 按名称、更新时间、得分排序</li>
+          </ul>
+        </section>
+
+        <section class="guide-section">
+          <h3>🔒 安全提示</h3>
+          <p>API 密钥仅保存在你的本地服务器（<code>provider_config.json</code>），不会传到任何第三方。建议使用 API Key 而非个人账号密码。</p>
+        </section>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="closeGuideFooterButton" class="btn btn-primary">知道了，开始使用</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+      <div class="modal-header">
+        <div>
+          <h2 id="settingsModalTitle">模型设置</h2>
+          <p class="muted-text">密钥仅保存到后端本地配置文件，不会暴露给浏览器调用模型。</p>
+        </div>
+        <button id="closeSettingsModalButton" class="icon-button" type="button" aria-label="关闭设置">×</button>
+      </div>
+
+      <form id="settingsForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="providerSelect">服务商</label>
+            <select id="providerSelect" name="provider">
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="custom">自定义接口</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="providerModel">模型选择</label>
+            <select id="providerModel" name="model"></select>
+          </div>
+
+          <div class="form-group">
+            <label for="providerApiBase">API地址（可选）</label>
+            <input
+              id="providerApiBase"
+              name="api_base"
+              placeholder="例如：https://api.openai.com/v1"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="providerApiKey">API密钥</label>
+          <input
+            id="providerApiKey"
+            name="api_key"
+            type="password"
+            placeholder="留空则保留已保存密钥"
+            autocomplete="off"
+          />
+          <p id="savedApiKeyHint" class="muted-text">尚未保存密钥</p>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="cancelSettingsModalButton" class="btn btn-secondary">取消</button>
+          <button type="submit" class="btn btn-primary">保存设置</button>
         </div>
       </form>
     </div>

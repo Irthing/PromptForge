@@ -329,3 +329,101 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: "SF
   .header-actions { justify-content: stretch; }
   .header-actions .btn { flex: 1; justify-content: center; }
 }
+
+/* Guide Modal */
+.guide-content {
+  max-width: 700px !important;
+  width: min(700px, 95%) !important;
+}
+
+.guide-body {
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.guide-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.guide-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.guide-section h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  color: var(--blue);
+}
+
+.guide-section p {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.guide-section ul {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 2;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+  line-height: 1.6;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--pink), var(--blue));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.guide-step code {
+  background: rgba(107, 214, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--blue);
+}
+
+.guide-example {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.guide-example p {
+  margin-bottom: 10px !important;
+}
+
+.guide-example p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.guide-example code {
+  background: rgba(167, 139, 250, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--purple);
+}

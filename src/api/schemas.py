@@ -1,15 +1,30 @@
+运行
+from __future__ import annotations
+
+import json
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from ..core.models import PromptTemplate, TestResult
+
+AIProviderName = Literal["openai", "anthropic", "custom"]
 
 
 class CreateTemplateRequest(BaseModel):
     name: str
     content: str
-    category: str = ""
+    category: str = "未分类"
+    tags: List[str] = Field(default_factory=list)
+    variables: List[str] = Field(default_factory=list)
+    version: str = "1.0"
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class UpdateTemplateRequest(BaseModel):
+    name: str
+    content: str
+    category: str = "未分类"
     tags: List[str] = Field(default_factory=list)
     variables: List[str] = Field(default_factory=list)
     version: str = "1.0"
@@ -28,7 +43,7 @@ class RenderTemplateResponse(BaseModel):
 class EvaluatePromptRequest(BaseModel):
     template_id: int
     input_data: Dict[str, Any] = Field(default_factory=dict)
-    model_name: str
+    model_name: str = "本地评估"
 
 
 class OptimizePromptRequest(BaseModel):
@@ -44,12 +59,12 @@ class PromptTemplateResponse(BaseModel):
     name: str
     content: str
     category: str
-    tags: List[str]
-    variables: List[str]
+    tags: List[str] = Field(default_factory=list)
+    variables: List[str] = Field(default_factory=list)
     version: str
     created_at: datetime
     updated_at: datetime
-    metadata: Dict[str, Any]
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class TestResultResponse(BaseModel):
@@ -58,41 +73,109 @@ class TestResultResponse(BaseModel):
     model_name: str
     input_prompt: str
     output_response: str
-    score: float
-    latency_ms: int
-    token_usage: int
+    score: float = 0
+    latency_ms: int = 0
+    token_usage: int = 0
     created_at: datetime
 
 
 class AnalyticsResponse(BaseModel):
-    templates_count: int
-    test_results_count: int
+    templates_count: int = 0
+    test_results_count: int = 0
+    average_score: float = 0
 
 
-def template_to_response(template: PromptTemplate) -> PromptTemplateResponse:
+class AIProviderSettingsRequest(BaseModel):
+    provider: AIProviderName = "openai"
+    api_key: Optional[str] = None
+    model: str = "gpt-4o-mini"
+    api_base: Optional[str] = None
+
+
+class AIProviderSettingsResponse(BaseModel):
+    provider: AIProviderName = "openai"
+    api_key: str = ""
+    model: str = "gpt-4o-mini"
+    api_base: str = "https://api.openai.com/v1"
+    configured: bool = False
+
+
+class ChatRequest(BaseModel):
+    template_id: int
+    context: Dict[str, Any] = Field(default_factory=dict)
+    provider: Optional[AIProviderName] = None
+
+
+class ChatResponse(BaseModel):
+    template_id: int
+    rendered: str
+    response: str
+    provider: str
+    model: str
+    latency_ms: int
+    token_usage: int = 0
+    raw_response: Optional[Any] = None
+
+
+def ensure_list(value: Any) -> List[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    return [str(value).strip()] if str(value).strip() else []
+
+
+def ensure_metadata(value: Any) -> Dict[str, Any]:
+    if value is None:
+        return {}
+
+    if isinstance(value, dict):
+        return value
+
+    if isinstance(value, str):
+        text = value.strip()
+
+        if not text:
+            return {}
+
+        try:
+            parsed = json.loads(text)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+    return {}
+
+
+def template_to_response(template: Any) -> PromptTemplateResponse:
     return PromptTemplateResponse(
         id=template.id,
         name=template.name,
         content=template.content,
         category=template.category,
-        tags=list(template.tags or []),
-        variables=list(template.variables or []),
+        tags=ensure_list(template.tags),
+        variables=ensure_list(template.variables),
         version=template.version,
         created_at=template.created_at,
         updated_at=template.updated_at,
-        metadata=dict(template.metadata or {}),
+        metadata=ensure_metadata(template.metadata),
     )
 
 
-def test_result_to_response(result: TestResult) -> TestResultResponse:
+def test_result_to_response(result: Any) -> TestResultResponse:
     return TestResultResponse(
         id=result.id,
         template_id=result.template_id,
         model_name=result.model_name,
         input_prompt=result.input_prompt,
         output_response=result.output_response,
-        score=result.score,
-        latency_ms=result.latency_ms,
-        token_usage=result.token_usage,
+        score=float(result.score or 0),
+        latency_ms=int(result.latency_ms or 0),
+        token_usage=int(result.token_usage or 0),
         created_at=result.created_at,
     )
