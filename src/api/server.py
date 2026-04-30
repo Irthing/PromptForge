@@ -420,15 +420,3 @@ async def chat_with_provider(
         token_usage=int(result.get("token_usage", 0)),
         raw_response=result.get("raw_response"),
     )
-
-These files incorporate all requested fixes:
-
-Issue 1: The API paths remain correct; fetchAPI("settings/provider") maps to /api/settings/provider.
-
-Issue 2: Temperature defaults to 0.7 across frontend, backend, and schema.
-
-Issue 3: max_tokens defaults to 8192, and the upper bound is 200000.
-
-Issue 4: The settings modal no longer closes when clicking the backdrop; only the close and cancel buttons (or pressing Escape) close it.
-
-Feel free to integrate these files into your project.
